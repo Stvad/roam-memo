@@ -31,6 +31,7 @@ const Footer = ({
   onPracticeClick,
   onSkipClick,
   onPrevClick,
+  onArchiveClick,
   isDone,
   hasCards,
   onCloseCallback,
@@ -93,6 +94,13 @@ const Footer = ({
       activateButtonFn(key, () => onSkipClick());
     },
     [onSkipClick]
+  );
+  const archiveFn = React.useMemo(
+    () => () => {
+      const key = 'archive-button';
+      activateButtonFn(key, () => onArchiveClick());
+    },
+    [onArchiveClick]
   );
 
   const hotkeys = React.useMemo(
@@ -159,8 +167,14 @@ const Footer = ({
         onKeyDown: toggleIntervalEditorOpen,
         disabled: reviewMode !== ReviewModes.FixedInterval,
       },
+      {
+        combo: 'A',
+        global: true,
+        label: 'Archive',
+        onKeyDown: archiveFn,
+      },
     ],
-    [skipFn, onPrevClick, reviewMode, showAnswers, showAnswerFn, intervalPractice, gradeFn]
+    [skipFn, onPrevClick, reviewMode, showAnswers, showAnswerFn, intervalPractice, gradeFn, archiveFn]
   );
   const { handleKeyDown, handleKeyUp } = Blueprint.useHotkeys(hotkeys);
 
@@ -219,6 +233,7 @@ const Footer = ({
             activateButtonFn={activateButtonFn}
             activeButtonKey={activeButtonKey}
             skipFn={skipFn}
+            archiveFn={archiveFn}
             gradeFn={gradeFn}
             intervalEstimates={intervalEstimates}
             intervalPractice={intervalPractice}
@@ -278,6 +293,7 @@ const GradingControlsWrapper = ({
   activateButtonFn,
   activeButtonKey,
   skipFn,
+  archiveFn,
   gradeFn,
   intervalEstimates,
   intervalPractice,
@@ -310,7 +326,6 @@ const GradingControlsWrapper = ({
       <ControlButton
         key="skip-button"
         className="text-base font-medium py-1"
-        wrapperClassName={`${isFixedIntervalMode ? 'sm:mr-auto' : ''}`}
         tooltipText={`Skip for now`}
         onClick={() => skipFn()}
         active={activeButtonKey === 'skip-button'}
@@ -319,6 +334,20 @@ const GradingControlsWrapper = ({
         Skip{' '}
         <span className="ml-2">
           <ButtonTags>S</ButtonTags>
+        </span>
+      </ControlButton>
+      <ControlButton
+        key="archive-button"
+        className="text-base font-medium py-1"
+        wrapperClassName={`${isFixedIntervalMode ? 'sm:mr-auto' : ''}`}
+        tooltipText={`Archive this card`}
+        onClick={() => archiveFn()}
+        active={activeButtonKey === 'archive-button'}
+        outlined
+      >
+        Archive{' '}
+        <span className="ml-2">
+          <ButtonTags>A</ButtonTags>
         </span>
       </ControlButton>
       {isFixedIntervalMode ? (

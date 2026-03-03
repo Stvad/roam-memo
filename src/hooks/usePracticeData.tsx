@@ -11,6 +11,7 @@ const usePracticeCardsData = ({
   isCramming,
   dailyLimit,
   shuffleCards,
+  hideArchivedCards,
 }) => {
   const [practiceData, setPracticeData] = React.useState<CompleteRecords>({});
   const [refetchTrigger, setRefetchTrigger] = React.useState(false);
@@ -29,6 +30,7 @@ const usePracticeCardsData = ({
         isCramming,
         shuffleCards,
         cachedData,
+        hideArchivedCards,
       });
 
       setToday(todayStats);
@@ -43,6 +45,7 @@ const usePracticeCardsData = ({
     tagsList,
     shuffleCards,
     cachedData,
+    hideArchivedCards,
   ]);
 
   return {

@@ -12,6 +12,7 @@ import {
   restoreCompletedUids,
 } from '~/queries/today';
 import { getChildBlocksOnPage } from './utils';
+import { getArchivedCardUids } from './archive';
 
 export const getPracticeData = async ({
   tagsList,
@@ -20,11 +21,16 @@ export const getPracticeData = async ({
   isCramming,
   shuffleCards,
   cachedData,
+  hideArchivedCards = true,
 }) => {
   const pluginPageData = (await getPluginPageData({
     dataPageTitle,
     limitToLatest: false,
   })) as CompleteRecords;
+
+  const archivedUids = hideArchivedCards
+    ? await getArchivedCardUids({ dataPageTitle })
+    : new Set<string>();
 
   const today = initializeToday({ tagsList, cachedData });
   const sessionData = {};
@@ -37,8 +43,19 @@ export const getPracticeData = async ({
       dataPageTitle,
     });
 
+    if (archivedUids.size > 0) {
+      // Filter archived cards from session data
+      for (const uid of Object.keys(currentSessionData)) {
+        if (archivedUids.has(uid)) {
+          delete currentSessionData[uid];
+        }
+      }
+    }
+
     sessionData[tag] = currentSessionData;
-    cardUids[tag] = currentCardUids;
+    cardUids[tag] = archivedUids.size > 0
+      ? currentCardUids.filter((uid) => !archivedUids.has(uid))
+      : currentCardUids;
   }
 
   await calculateCompletedTodayCounts({

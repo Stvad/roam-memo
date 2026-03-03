@@ -88,6 +88,17 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
           },
         },
       },
+      {
+        id: 'hideArchivedCards',
+        name: 'Hide Archived Cards',
+        description: 'Exclude archived cards from reviews. Archived cards can be marked during review using the Archive button (A).',
+        action: {
+          type: 'switch',
+          onChange: (e) => {
+            processChange({ key: 'hideArchivedCards', value: e.target.checked });
+          },
+        },
+      },
     ],
   };
 };

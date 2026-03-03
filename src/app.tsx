@@ -3,6 +3,7 @@ import * as Blueprint from '@blueprintjs/core';
 import PracticeOverlay from '~/components/overlay/PracticeOverlay';
 import SidePannelWidget from '~/components/SidePanelWidget';
 import practice from '~/practice';
+import { archiveCard } from '~/queries';
 import usePracticeData from '~/hooks/usePracticeData';
 import useTags from '~/hooks/useTags';
 import useSettings from '~/hooks/useSettings';
@@ -26,7 +27,7 @@ const App = () => {
   const [showPracticeOverlay, setShowPracticeOverlay] = React.useState(false);
   const [isCramming, setIsCramming] = React.useState(false);
 
-  const { tagsListString, dataPageTitle, dailyLimit, rtlEnabled, shuffleCards } = useSettings();
+  const { tagsListString, dataPageTitle, dailyLimit, rtlEnabled, shuffleCards, hideArchivedCards } = useSettings();
   const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
 
   const { fetchCacheData, saveCacheData, data: cachedData } = useCachedData({ dataPageTitle });
@@ -39,6 +40,7 @@ const App = () => {
     isCramming,
     dailyLimit,
     shuffleCards,
+    hideArchivedCards,
   });
 
   const handlePracticeClick = async ({ refUid, ...cardData }: handlePracticeProps) => {
@@ -57,6 +59,19 @@ const App = () => {
       });
     } catch (error) {
       console.error('Error Saving Practice Data', error);
+    }
+  };
+
+  const handleArchiveClick = async (refUid: string) => {
+    if (!refUid) {
+      console.error('HandleArchiveFn Error: No refUid provided');
+      return;
+    }
+
+    try {
+      await archiveCard({ refUid, dataPageTitle });
+    } catch (error) {
+      console.error('Error Archiving Card', error);
     }
   };
 
@@ -132,6 +147,7 @@ const App = () => {
             isOpen={true}
             practiceData={practiceData}
             handlePracticeClick={handlePracticeClick}
+            handleArchiveClick={handleArchiveClick}
             onCloseCallback={onClosePracticeOverlayCallback}
             handleMemoTagChange={handleMemoTagChange}
             handleReviewMoreClick={handleReviewMoreClick}

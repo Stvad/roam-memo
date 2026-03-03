@@ -11,6 +11,7 @@ import {
   parentChainInfoQuery,
   getPracticeData,
   getPageQuery,
+  archivedCardsQuery,
 } from '~/queries';
 import * as dateUtils from '~/utils/date';
 import * as testUtils from '~/utils/testUtils';
@@ -96,6 +97,11 @@ export const generateMockRoamAlphaAPI = ({
         query: getPluginPageBlockDataQuery,
         result: [],
         args: [dataPageTitle, 'data'],
+      },
+      {
+        query: archivedCardsQuery,
+        args: [dataPageTitle],
+        result: [],
       },
       {
         query: blockInfoQuery,

@@ -1,3 +1,4 @@
+export * from '~/queries/archive';
 export * from '~/queries/cache';
 export * from '~/queries/data';
 export * from '~/queries/legacyRoamSr';

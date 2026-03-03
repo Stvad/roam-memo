@@ -46,6 +46,7 @@ interface Props {
   practiceData: CompleteRecords;
   today: Today;
   handlePracticeClick: (props: handlePracticeProps) => void;
+  handleArchiveClick: (refUid: string) => void;
   handleMemoTagChange: (tag: string) => void;
   handleReviewMoreClick: () => void;
   isCramming: boolean;
@@ -62,6 +63,7 @@ const PracticeOverlay = ({
   practiceData,
   today,
   handlePracticeClick,
+  handleArchiveClick,
   handleMemoTagChange,
   handleReviewMoreClick,
   isCramming,
@@ -203,6 +205,14 @@ const PracticeOverlay = ({
     setCurrentIndex(currentIndex + 1);
   }, [currentIndex, isDone]);
 
+  const onArchiveClick = React.useCallback(() => {
+    if (isDone || !currentCardRefUid) return;
+
+    handleArchiveClick(currentCardRefUid);
+    setShowAnswers(false);
+    setCurrentIndex(currentIndex + 1);
+  }, [currentIndex, isDone, currentCardRefUid, handleArchiveClick]);
+
   const onPrevClick = React.useCallback(() => {
     if (isFirst) return;
 
@@ -339,6 +349,7 @@ const PracticeOverlay = ({
           onPracticeClick={onPracticeClick}
           onSkipClick={onSkipClick}
           onPrevClick={onPrevClick}
+          onArchiveClick={onArchiveClick}
           setShowAnswers={setShowAnswers}
           showAnswers={showAnswers}
           isDone={isDone}
