@@ -14,6 +14,7 @@ import useCachedData from '~/hooks/useCachedData';
 import useOnVisibilityStateChange from '~/hooks/useOnVisibilityStateChange';
 import { IntervalMultiplierType, ReviewModes } from '~/models/session';
 import { RenderMode } from '~/models/practice';
+import { SessionFilterConfig } from '~/queries/data';
 
 export interface handlePracticeProps {
   refUid: string;
@@ -23,14 +24,34 @@ export interface handlePracticeProps {
   intervalMultiplierType: IntervalMultiplierType;
 }
 
+const parseExclusionTags = (globalExclusionTags: string): string[] =>
+  globalExclusionTags
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+
 const App = () => {
   const [showPracticeOverlay, setShowPracticeOverlay] = React.useState(false);
   const [isCramming, setIsCramming] = React.useState(false);
 
-  const { tagsListString, dataPageTitle, dailyLimit, rtlEnabled, shuffleCards, hideArchivedCards } = useSettings();
+  const { tagsListString, dataPageTitle, dailyLimit, rtlEnabled, shuffleCards, globalExclusionTags } = useSettings();
   const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
 
   const { fetchCacheData, saveCacheData, data: cachedData } = useCachedData({ dataPageTitle });
+
+  // Session filter state — initialized from global exclusion tags, reset when overlay opens
+  const [sessionFilter, setSessionFilter] = React.useState<SessionFilterConfig>({
+    includeTags: [],
+    excludeTags: parseExclusionTags(globalExclusionTags),
+  });
+
+  // Keep session filter in sync when global exclusion tags setting changes
+  React.useEffect(() => {
+    setSessionFilter((prev) => ({
+      ...prev,
+      excludeTags: parseExclusionTags(globalExclusionTags),
+    }));
+  }, [globalExclusionTags]);
 
   const { practiceData, today, fetchPracticeData } = usePracticeData({
     tagsList,
@@ -40,7 +61,7 @@ const App = () => {
     isCramming,
     dailyLimit,
     shuffleCards,
-    hideArchivedCards,
+    sessionFilter,
   });
 
   const handlePracticeClick = async ({ refUid, ...cardData }: handlePracticeProps) => {
@@ -91,6 +112,11 @@ const App = () => {
   });
 
   const onShowPracticeOverlay = () => {
+    // Reset session filter to defaults when opening
+    setSessionFilter({
+      includeTags: [],
+      excludeTags: parseExclusionTags(globalExclusionTags),
+    });
     refreshData();
     setShowPracticeOverlay(true);
     setIsCramming(false);
@@ -157,6 +183,8 @@ const App = () => {
             setIsCramming={setIsCramming}
             rtlEnabled={rtlEnabled}
             today={today}
+            sessionFilter={sessionFilter}
+            onSessionFilterChange={setSessionFilter}
           />
         )}
       </>

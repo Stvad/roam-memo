@@ -11,8 +11,8 @@ import {
   parentChainInfoQuery,
   getPracticeData,
   getPageQuery,
-  archivedCardsQuery,
 } from '~/queries';
+import { cardUidsWithTagQuery } from '~/queries/tags';
 import * as dateUtils from '~/utils/date';
 import * as testUtils from '~/utils/testUtils';
 import * as queries from '~/queries/save';
@@ -99,7 +99,7 @@ export const generateMockRoamAlphaAPI = ({
         args: [dataPageTitle, 'data'],
       },
       {
-        query: archivedCardsQuery,
+        query: cardUidsWithTagQuery,
         args: [dataPageTitle],
         result: [],
       },

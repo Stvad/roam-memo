@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Today, TodayInitial } from '~/models/practice';
 import { CompleteRecords } from '~/models/session';
 import * as queries from '~/queries';
+import { SessionFilterConfig } from '~/queries/data';
 
 const usePracticeCardsData = ({
   tagsList,
@@ -11,7 +12,16 @@ const usePracticeCardsData = ({
   isCramming,
   dailyLimit,
   shuffleCards,
-  hideArchivedCards,
+  sessionFilter,
+}: {
+  tagsList: string[];
+  selectedTag: string;
+  dataPageTitle: string;
+  cachedData: any;
+  isCramming: boolean;
+  dailyLimit: number;
+  shuffleCards: boolean;
+  sessionFilter: SessionFilterConfig;
 }) => {
   const [practiceData, setPracticeData] = React.useState<CompleteRecords>({});
   const [refetchTrigger, setRefetchTrigger] = React.useState(false);
@@ -30,7 +40,7 @@ const usePracticeCardsData = ({
         isCramming,
         shuffleCards,
         cachedData,
-        hideArchivedCards,
+        sessionFilter,
       });
 
       setToday(todayStats);
@@ -45,7 +55,7 @@ const usePracticeCardsData = ({
     tagsList,
     shuffleCards,
     cachedData,
-    hideArchivedCards,
+    sessionFilter,
   ]);
 
   return {

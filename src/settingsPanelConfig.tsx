@@ -89,13 +89,16 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
         },
       },
       {
-        id: 'hideArchivedCards',
-        name: 'Hide Archived Cards',
-        description: 'Exclude archived cards from reviews. Archived cards can be marked during review using the Archive button (A).',
+        id: 'globalExclusionTags',
+        name: 'Global Exclusion Tags',
+        description:
+          'Comma-separated tags to exclude from all reviews. Cards tagged with any of these will be hidden. Default: "memo/archived"',
         action: {
-          type: 'switch',
+          type: 'input',
+          placeholder: defaultSettings.globalExclusionTags,
           onChange: (e) => {
-            processChange({ key: 'hideArchivedCards', value: e.target.checked });
+            const value = e.target.value.trim();
+            processChange({ key: 'globalExclusionTags', value });
           },
         },
       },

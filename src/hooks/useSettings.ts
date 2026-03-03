@@ -7,7 +7,7 @@ export type Settings = {
   dailyLimit: number;
   rtlEnabled: boolean;
   shuffleCards: boolean;
-  hideArchivedCards: boolean;
+  globalExclusionTags: string;
 };
 
 export const defaultSettings: Settings = {
@@ -16,7 +16,7 @@ export const defaultSettings: Settings = {
   dailyLimit: 0, // 0 = no limit,
   rtlEnabled: false,
   shuffleCards: false,
-  hideArchivedCards: true,
+  globalExclusionTags: 'memo/archived',
 };
 
 // @TODO: Refactor/Hoist this so we can call useSettings in multiple places
@@ -50,9 +50,6 @@ const useSettings = () => {
     // to true here unless toggled off
     if (!('shuffleCards' in allSettings)) {
       window.roamMemo.extensionAPI.settings.set('shuffleCards', defaultSettings.shuffleCards);
-    }
-    if (!('hideArchivedCards' in allSettings)) {
-      window.roamMemo.extensionAPI.settings.set('hideArchivedCards', defaultSettings.hideArchivedCards);
     }
 
     // For some reason the getAll() method casts numbers to strings, so here we

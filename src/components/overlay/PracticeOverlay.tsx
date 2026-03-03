@@ -13,11 +13,13 @@ import mediaQueries from '~/utils/mediaQueries';
 
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
+import SessionFilter from '~/components/overlay/SessionFilter';
 import ButtonTags from '~/components/ButtonTags';
 import { CompleteRecords, IntervalMultiplierType, ReviewModes } from '~/models/session';
 import useCurrentCardData from '~/hooks/useCurrentCardData';
 import { generateNewSession } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
+import { SessionFilterConfig } from '~/queries/data';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
 
@@ -53,6 +55,8 @@ interface Props {
   setIsCramming: (isCramming: boolean) => void;
   rtlEnabled: boolean;
   setRenderMode: (tag: string, mode: RenderMode) => void;
+  sessionFilter: SessionFilterConfig;
+  onSessionFilterChange: (filter: SessionFilterConfig) => void;
 }
 
 const PracticeOverlay = ({
@@ -70,6 +74,8 @@ const PracticeOverlay = ({
   setIsCramming,
   rtlEnabled,
   setRenderMode,
+  sessionFilter,
+  onSessionFilterChange,
 }: Props) => {
   const todaySelectedTag = today.tags[selectedTag];
   const newCardsUids = todaySelectedTag.newUids;
@@ -287,6 +293,8 @@ const PracticeOverlay = ({
           showBreadcrumbs={showBreadcrumbs}
           setShowBreadcrumbs={setShowBreadcrumbs}
           isCramming={isCramming}
+          sessionFilter={sessionFilter}
+          onSessionFilterChange={onSessionFilterChange}
         />
 
         <DialogBody
@@ -638,6 +646,8 @@ const Header = ({
   showBreadcrumbs,
   setShowBreadcrumbs,
   isCramming,
+  sessionFilter,
+  onSessionFilterChange,
 }) => {
   const { selectedTag, today, currentIndex } = useSafeContext(MainContext);
   const todaySelectedTag = today.tags[selectedTag];
@@ -657,18 +667,24 @@ const Header = ({
       </div>
       <div className="flex items-center justify-end">
         {!isDone && (
-          <div onClick={() => setShowBreadcrumbs(!showBreadcrumbs)} className="px-1 cursor-pointer">
-            {/* @ts-ignore */}
-            <Tooltip
-              content={<BreadcrumbTooltipContent showBreadcrumbs={showBreadcrumbs} />}
-              placement="left"
-            >
-              <Blueprint.Icon
-                icon={showBreadcrumbs ? 'eye-open' : 'eye-off'}
-                className={showBreadcrumbs ? 'opacity-100' : 'opacity-60'}
-              />
-            </Tooltip>
-          </div>
+          <>
+            <SessionFilter
+              sessionFilter={sessionFilter}
+              onSessionFilterChange={onSessionFilterChange}
+            />
+            <div onClick={() => setShowBreadcrumbs(!showBreadcrumbs)} className="px-1 cursor-pointer">
+              {/* @ts-ignore */}
+              <Tooltip
+                content={<BreadcrumbTooltipContent showBreadcrumbs={showBreadcrumbs} />}
+                placement="left"
+              >
+                <Blueprint.Icon
+                  icon={showBreadcrumbs ? 'eye-open' : 'eye-off'}
+                  className={showBreadcrumbs ? 'opacity-100' : 'opacity-60'}
+                />
+              </Tooltip>
+            </div>
+          </>
         )}
         <span data-testid="status-badge">
           <StatusBadge

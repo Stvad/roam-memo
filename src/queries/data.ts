@@ -12,7 +12,12 @@ import {
   restoreCompletedUids,
 } from '~/queries/today';
 import { getChildBlocksOnPage } from './utils';
-import { getArchivedCardUids } from './archive';
+import { getCardUidsWithAnyTag, getCardUidsWithAllTags } from './tags';
+
+export interface SessionFilterConfig {
+  includeTags: string[];
+  excludeTags: string[];
+}
 
 export const getPracticeData = async ({
   tagsList,
@@ -21,16 +26,38 @@ export const getPracticeData = async ({
   isCramming,
   shuffleCards,
   cachedData,
-  hideArchivedCards = true,
+  sessionFilter = { includeTags: [], excludeTags: [] },
+}: {
+  tagsList: string[];
+  dataPageTitle: string;
+  dailyLimit: number;
+  isCramming: boolean;
+  shuffleCards: boolean;
+  cachedData: any;
+  sessionFilter?: SessionFilterConfig;
 }) => {
   const pluginPageData = (await getPluginPageData({
     dataPageTitle,
     limitToLatest: false,
   })) as CompleteRecords;
 
-  const archivedUids = hideArchivedCards
-    ? await getArchivedCardUids({ dataPageTitle })
-    : new Set<string>();
+  // Build exclusion set from exclude tags
+  const excludedUids =
+    sessionFilter.excludeTags.length > 0
+      ? await getCardUidsWithAnyTag({ dataPageTitle, tags: sessionFilter.excludeTags })
+      : new Set<string>();
+
+  // Build inclusion set from include tags (cards must have ALL include tags)
+  const includedUids =
+    sessionFilter.includeTags.length > 0
+      ? await getCardUidsWithAllTags({ dataPageTitle, tags: sessionFilter.includeTags })
+      : null; // null means "no inclusion filter" (include all)
+
+  const shouldExclude = (uid: string) => {
+    if (excludedUids.has(uid)) return true;
+    if (includedUids !== null && !includedUids.has(uid)) return true;
+    return false;
+  };
 
   const today = initializeToday({ tagsList, cachedData });
   const sessionData = {};
@@ -43,18 +70,18 @@ export const getPracticeData = async ({
       dataPageTitle,
     });
 
-    if (archivedUids.size > 0) {
-      // Filter archived cards from session data
+    const hasFilter = excludedUids.size > 0 || includedUids !== null;
+    if (hasFilter) {
       for (const uid of Object.keys(currentSessionData)) {
-        if (archivedUids.has(uid)) {
+        if (shouldExclude(uid)) {
           delete currentSessionData[uid];
         }
       }
     }
 
     sessionData[tag] = currentSessionData;
-    cardUids[tag] = archivedUids.size > 0
-      ? currentCardUids.filter((uid) => !archivedUids.has(uid))
+    cardUids[tag] = hasFilter
+      ? currentCardUids.filter((uid) => !shouldExclude(uid))
       : currentCardUids;
   }
 
@@ -170,7 +197,13 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
 
       if (!cur.children) return acc;
 
-      const latestChild = cur.children.find((child) => child.order === 0);
+      // Find the latest session child, skipping tag blocks
+      const sessionChildren = cur.children.filter(isSessionChild);
+      const latestChild = sessionChildren.find((child) => child.order === 0)
+        || sessionChildren[0];
+
+      if (!latestChild) return acc;
+
       acc[uid].dateCreated = parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]'));
 
       if (!latestChild.children) return acc;
@@ -179,6 +212,23 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
       return acc;
     }, {}) || {};
 
+/**
+ * Returns true if a child block looks like a session record (starts with a date like [[...]]).
+ * Tag children like [[memo/archived]] are page references, not session records — we detect
+ * sessions by checking that the block string contains a date-like pattern and has field children.
+ */
+const isSessionChild = (child: { string: string; children?: any[] }): boolean => {
+  // Session records have the format: [[DateString]] emoji
+  // Tag blocks have the format: [[tagName]]
+  // Session records always have children (grade::, interval::, etc.)
+  if (!child.children || child.children.length === 0) return false;
+
+  // Try to parse a date from the block string — session records contain Roam date strings
+  const dateString = getStringBetween(child.string, '[[', ']]');
+  const parsed = parseRoamDateString(dateString);
+  return parsed instanceof Date && !isNaN(parsed.getTime());
+};
+
 const mapPluginPageData = (queryResultsData): CompleteRecords =>
   queryResultsData
     .map((arr) => arr[0])[0]
@@ -186,16 +236,16 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
       const uid = getStringBetween(cur.string, '((', '))');
       acc[uid] = [];
 
-      // Add date
       if (!cur.children) return acc;
 
       for (const child of cur.children) {
+        // Skip non-session children (e.g., tag blocks like [[memo/archived]])
+        if (!isSessionChild(child)) continue;
+
         const record = {
           refUid: uid,
           dateCreated: parseRoamDateString(getStringBetween(child.string, '[[', ']]')),
         };
-
-        if (!child.children) return acc;
 
         parseFieldValues(record, child);
 
