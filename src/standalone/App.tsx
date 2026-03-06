@@ -105,6 +105,9 @@ const App = () => {
   const currentBlock = currentRefUid ? blockCache[currentRefUid] : undefined;
   const remainingCount = currentQueue.length;
   const totalCount = selectedTag && sessionData ? sessionData.today.tags[selectedTag]?.due + sessionData.today.tags[selectedTag]?.new : 0;
+  const completedCount = selectedTag && sessionData ? sessionData.today.tags[selectedTag]?.completed || 0 : 0;
+  const isReviewFinished = Boolean(sessionData && !currentRefUid && totalCount === 0 && completedCount > 0);
+  const hasLoadedSession = Boolean(sessionData);
 
   const hasSavedCredentials = Boolean(settings.graph.trim() && settings.token.trim());
 
@@ -531,15 +534,19 @@ const App = () => {
             <div className="review-header">
               <div>
                 <p className="eyebrow">Current card</p>
-                <h2>{currentRefUid || 'No cards ready'}</h2>
+                <h2>{currentRefUid ? currentRefUid : isReviewFinished ? 'Review complete' : 'No cards ready'}</h2>
               </div>
               <div className="status-cluster">
-                {currentCardData?.nextDueDate ? (
+                {currentRefUid && currentCardData?.nextDueDate ? (
                   <span className="status-badge">
                     {getDueLabel(currentCardData)}
                   </span>
-                ) : (
+                ) : currentRefUid ? (
                   <span className="status-badge">New</span>
+                ) : isReviewFinished ? (
+                  <span className="status-badge">Finished</span>
+                ) : (
+                  <span className="status-badge muted">Waiting</span>
                 )}
                 <span className="status-badge muted">
                   {currentRefUid ? `${Math.min(currentIndex + 1, remainingCount)} / ${Math.max(remainingCount, totalCount)}` : '0 / 0'}
@@ -649,8 +656,14 @@ const App = () => {
               </>
             ) : (
               <div className="empty-state">
-                <h3>No cards ready.</h3>
-                <p>Connect to the graph, pick a tag, or review a few new cards to seed the queue.</p>
+                <h3>{isReviewFinished ? 'Deck complete.' : hasLoadedSession ? 'No cards ready.' : 'Nothing loaded yet.'}</h3>
+                <p>
+                  {isReviewFinished
+                    ? `You finished ${completedCount} ${completedCount === 1 ? 'card' : 'cards'} in ${selectedTag || 'this deck'}.`
+                    : hasLoadedSession
+                      ? 'Connect to the graph, pick a tag, or review a few new cards to seed the queue.'
+                      : 'Connect to the graph to load a review queue.'}
+                </p>
               </div>
             )}
           </section>
