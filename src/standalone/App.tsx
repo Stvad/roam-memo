@@ -19,6 +19,12 @@ const DEFAULT_SETTINGS: ReviewSettings = {
 
 const STORAGE_KEY = 'roam-memo-standalone-settings';
 const ARCHIVE_TAG = 'memo/archived';
+type ReviewSessionData = Awaited<ReturnType<typeof loadReviewSession>>;
+type OptimisticUpdate = {
+  id: number;
+  refUid: string;
+  nextSession?: Session;
+};
 
 const usePersistentSettings = () => {
   const [settings, setSettings] = React.useState<ReviewSettings>(() => {
@@ -39,13 +45,76 @@ const usePersistentSettings = () => {
   return [settings, setSettings] as const;
 };
 
+const applyOptimisticUpdate = (
+  current: ReviewSessionData,
+  { refUid, nextSession }: Pick<OptimisticUpdate, 'refUid' | 'nextSession'>
+): ReviewSessionData => {
+  const nextToday = {
+    ...current.today,
+    tags: { ...current.today.tags },
+  };
+
+  for (const tag of current.tagsList) {
+    const tagData = current.today.tags[tag];
+    const isDue = tagData.dueUids.includes(refUid);
+    const isNew = tagData.newUids.includes(refUid);
+
+    nextToday.tags[tag] = {
+      ...tagData,
+      dueUids: tagData.dueUids.filter((cardUid) => cardUid !== refUid),
+      newUids: tagData.newUids.filter((cardUid) => cardUid !== refUid),
+      due: isDue ? Math.max(tagData.due - 1, 0) : tagData.due,
+      new: isNew ? Math.max(tagData.new - 1, 0) : tagData.new,
+      completed: isDue || isNew ? tagData.completed + 1 : tagData.completed,
+      completedUids:
+        isDue || isNew
+          ? Array.from(new Set([...tagData.completedUids, refUid]))
+          : tagData.completedUids,
+      completedDue: isDue ? tagData.completedDue + 1 : tagData.completedDue,
+      completedNew: isNew ? tagData.completedNew + 1 : tagData.completedNew,
+      completedDueUids: isDue
+        ? Array.from(new Set([...tagData.completedDueUids, refUid]))
+        : tagData.completedDueUids,
+      completedNewUids: isNew
+        ? Array.from(new Set([...tagData.completedNewUids, refUid]))
+        : tagData.completedNewUids,
+    };
+  }
+
+  nextToday.combinedToday = {
+    ...current.today.combinedToday,
+    dueUids: current.today.combinedToday.dueUids.filter((cardUid) => cardUid !== refUid),
+    newUids: current.today.combinedToday.newUids.filter((cardUid) => cardUid !== refUid),
+    completedUids: Array.from(new Set([...current.today.combinedToday.completedUids, refUid])),
+  };
+  nextToday.combinedToday.due = nextToday.combinedToday.dueUids.length;
+  nextToday.combinedToday.new = nextToday.combinedToday.newUids.length;
+  nextToday.combinedToday.completed = nextToday.combinedToday.completedUids.length;
+  nextToday.combinedToday.status =
+    nextToday.combinedToday.due + nextToday.combinedToday.new === 0
+      ? CompletionStatus.Finished
+      : CompletionStatus.Partial;
+
+  return {
+    ...current,
+    today: nextToday,
+    practiceData: {
+      ...current.practiceData,
+      [refUid]:
+        nextSession
+          ? [...(current.practiceData[refUid] || []), nextSession]
+          : current.practiceData[refUid],
+    },
+  };
+};
+
 const App = () => {
   const [settings, setSettings] = usePersistentSettings();
-  const [sessionData, setSessionData] = React.useState<Awaited<ReturnType<typeof loadReviewSession>> | null>(null);
+  const [sessionData, setSessionData] = React.useState<ReviewSessionData | null>(null);
   const [selectedTag, setSelectedTag] = React.useState('');
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [showAnswers, setShowAnswers] = React.useState(false);
-  const [reviewedUids, setReviewedUids] = React.useState<string[]>([]);
+  const [optimisticUpdates, setOptimisticUpdates] = React.useState<OptimisticUpdate[]>([]);
   const [blockCache, setBlockCache] = React.useState<Record<string, BlockInfo>>({});
   const [isLoading, setIsLoading] = React.useState(false);
   const [pendingWrites, setPendingWrites] = React.useState(0);
@@ -53,6 +122,7 @@ const App = () => {
   const [error, setError] = React.useState('');
   const [statusMessage, setStatusMessage] = React.useState('');
   const didAutoConnectRef = React.useRef(false);
+  const optimisticUpdateIdRef = React.useRef(0);
 
   const client = React.useMemo(() => {
     if (!settings.graph.trim() || !settings.token.trim()) return null;
@@ -73,7 +143,7 @@ const App = () => {
       setSessionData(nextSession);
       setSelectedTag((current) => current || nextSession.tagsList[0] || '');
       setCurrentIndex(0);
-      setReviewedUids([]);
+      setOptimisticUpdates([]);
       setBlockCache({});
       setSyncWarning('');
       setStatusMessage('');
@@ -84,29 +154,38 @@ const App = () => {
     }
   }, [client, settings]);
 
+  const displaySessionData = React.useMemo(() => {
+    if (!sessionData) return null;
+
+    return optimisticUpdates.reduce(
+      (current, update) => applyOptimisticUpdate(current, update),
+      sessionData
+    );
+  }, [optimisticUpdates, sessionData]);
+
   const queuesByTag = React.useMemo(() => {
-    if (!sessionData) return {};
+    if (!displaySessionData) return {};
 
     return Object.fromEntries(
-      sessionData.tagsList.map((tag) => {
-        const tagData = sessionData.today.tags[tag];
-        const queue = [...tagData.dueUids, ...tagData.newUids].filter(
-          (uid) => !reviewedUids.includes(uid)
-        );
+      displaySessionData.tagsList.map((tag) => {
+        const tagData = displaySessionData.today.tags[tag];
+        const queue = [...tagData.dueUids, ...tagData.newUids];
         return [tag, queue];
       })
     ) as Record<string, string[]>;
-  }, [reviewedUids, sessionData]);
+  }, [displaySessionData]);
 
   const currentQueue = selectedTag ? queuesByTag[selectedTag] || [] : [];
   const currentRefUid = currentQueue[currentIndex];
-  const currentSessions = currentRefUid && sessionData ? sessionData.practiceData[currentRefUid] || [] : [];
+  const currentSessions = currentRefUid && displaySessionData ? displaySessionData.practiceData[currentRefUid] || [] : [];
   const currentCardData = getCurrentCardData(currentSessions);
   const currentBlock = currentRefUid ? blockCache[currentRefUid] : undefined;
   const remainingCount = currentQueue.length;
-  const totalCount = selectedTag && sessionData ? sessionData.today.tags[selectedTag]?.due + sessionData.today.tags[selectedTag]?.new : 0;
-  const completedCount = selectedTag && sessionData ? sessionData.today.tags[selectedTag]?.completed || 0 : 0;
-  const isReviewFinished = Boolean(sessionData && !currentRefUid && totalCount === 0 && completedCount > 0);
+  const totalCount = selectedTag && displaySessionData
+    ? (displaySessionData.today.tags[selectedTag]?.due || 0) + (displaySessionData.today.tags[selectedTag]?.new || 0)
+    : 0;
+  const completedCount = selectedTag && displaySessionData ? displaySessionData.today.tags[selectedTag]?.completed || 0 : 0;
+  const isReviewFinished = Boolean(displaySessionData && !currentRefUid && totalCount === 0 && completedCount > 0);
   const hasLoadedSession = Boolean(sessionData);
 
   const hasSavedCredentials = Boolean(settings.graph.trim() && settings.token.trim());
@@ -119,12 +198,19 @@ const App = () => {
   }, [client, hasSavedCredentials, refresh]);
 
   React.useEffect(() => {
-    if (!sessionData) return;
+    if (!displaySessionData) return;
 
-    if (!selectedTag || !sessionData.tagsList.includes(selectedTag)) {
-      setSelectedTag(sessionData.tagsList[0] || '');
+    if (!selectedTag || !displaySessionData.tagsList.includes(selectedTag)) {
+      setSelectedTag(displaySessionData.tagsList[0] || '');
     }
-  }, [selectedTag, sessionData]);
+  }, [displaySessionData, selectedTag]);
+
+  React.useEffect(() => {
+    const nextMaxIndex = Math.max(currentQueue.length - 1, 0);
+    if (currentIndex > nextMaxIndex) {
+      setCurrentIndex(nextMaxIndex);
+    }
+  }, [currentIndex, currentQueue.length]);
 
   React.useEffect(() => {
     if (!client || !currentRefUid || blockCache[currentRefUid]) return;
@@ -191,72 +277,6 @@ const App = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [currentCardData.reviewMode, currentQueue.length, currentRefUid, showAnswers]);
 
-  const markCardReviewed = React.useCallback((uid: string, nextSession?: Session) => {
-    setReviewedUids((current) => (current.includes(uid) ? current : [...current, uid]));
-
-    setSessionData((current) => {
-      if (!current) return current;
-
-      const nextToday = {
-        ...current.today,
-        tags: { ...current.today.tags },
-      };
-
-      for (const tag of current.tagsList) {
-        const tagData = current.today.tags[tag];
-        const isDue = tagData.dueUids.includes(uid);
-        const isNew = tagData.newUids.includes(uid);
-
-        nextToday.tags[tag] = {
-          ...tagData,
-          dueUids: tagData.dueUids.filter((cardUid) => cardUid !== uid),
-          newUids: tagData.newUids.filter((cardUid) => cardUid !== uid),
-          due: isDue ? Math.max(tagData.due - 1, 0) : tagData.due,
-          new: isNew ? Math.max(tagData.new - 1, 0) : tagData.new,
-          completed: isDue || isNew ? tagData.completed + 1 : tagData.completed,
-          completedUids:
-            isDue || isNew
-              ? Array.from(new Set([...tagData.completedUids, uid]))
-              : tagData.completedUids,
-          completedDue: isDue ? tagData.completedDue + 1 : tagData.completedDue,
-          completedNew: isNew ? tagData.completedNew + 1 : tagData.completedNew,
-          completedDueUids: isDue
-            ? Array.from(new Set([...tagData.completedDueUids, uid]))
-            : tagData.completedDueUids,
-          completedNewUids: isNew
-            ? Array.from(new Set([...tagData.completedNewUids, uid]))
-            : tagData.completedNewUids,
-        };
-      }
-
-      nextToday.combinedToday = {
-        ...current.today.combinedToday,
-        dueUids: current.today.combinedToday.dueUids.filter((cardUid) => cardUid !== uid),
-        newUids: current.today.combinedToday.newUids.filter((cardUid) => cardUid !== uid),
-        completedUids: Array.from(new Set([...current.today.combinedToday.completedUids, uid])),
-      };
-      nextToday.combinedToday.due = nextToday.combinedToday.dueUids.length;
-      nextToday.combinedToday.new = nextToday.combinedToday.newUids.length;
-      nextToday.combinedToday.completed = nextToday.combinedToday.completedUids.length;
-      nextToday.combinedToday.status =
-        nextToday.combinedToday.due + nextToday.combinedToday.new === 0
-          ? CompletionStatus.Finished
-          : CompletionStatus.Partial;
-
-      return {
-        ...current,
-        today: nextToday,
-        practiceData: {
-          ...current.practiceData,
-          [uid]:
-            nextSession
-              ? [...(current.practiceData[uid] || []), nextSession]
-              : current.practiceData[uid],
-        },
-      };
-    });
-  }, []);
-
   const runOptimisticWrite = React.useCallback(
     ({
       refUid,
@@ -271,22 +291,33 @@ const App = () => {
       pendingLabel: string;
       successLabel: string;
     }) => {
+      const optimisticUpdate = {
+        id: optimisticUpdateIdRef.current + 1,
+        refUid,
+        nextSession: optimisticSession,
+      };
+
+      optimisticUpdateIdRef.current = optimisticUpdate.id;
       setError('');
       setSyncWarning('');
-      if (optimisticSession) {
-        markCardReviewed(refUid, optimisticSession);
-      } else {
-        markCardReviewed(refUid);
-      }
-
+      setOptimisticUpdates((current) => [...current, optimisticUpdate]);
       setPendingWrites((current) => current + 1);
       setStatusMessage(pendingLabel);
 
       void request()
         .then(() => {
+          setSessionData((current) =>
+            current ? applyOptimisticUpdate(current, optimisticUpdate) : current
+          );
+          setOptimisticUpdates((current) =>
+            current.filter((update) => update.id !== optimisticUpdate.id)
+          );
           setStatusMessage(successLabel);
         })
         .catch((caughtError) => {
+          setOptimisticUpdates((current) =>
+            current.filter((update) => update.id !== optimisticUpdate.id)
+          );
           if (caughtError instanceof RoamApiError && caughtError.status === 429) {
             const retrySeconds = Math.ceil((caughtError.retryAfterMs || 0) / 1000);
             setSyncWarning(
@@ -301,7 +332,7 @@ const App = () => {
           setPendingWrites((current) => Math.max(current - 1, 0));
         });
     },
-    [markCardReviewed]
+    []
   );
 
   const handleGrade = React.useCallback(
@@ -502,8 +533,8 @@ const App = () => {
               <h2>Decks</h2>
             </div>
             <div className="deck-list">
-              {(sessionData?.tagsList || []).map((tag) => {
-                const tagStats = sessionData?.today.tags[tag];
+              {(displaySessionData?.tagsList || []).map((tag) => {
+                const tagStats = displaySessionData?.today.tags[tag];
                 const queueSize = queuesByTag[tag]?.length || 0;
 
                 return (
@@ -522,9 +553,9 @@ const App = () => {
               })}
             </div>
             <div className="deck-totals">
-              <Stat label="Due" value={String(sessionData?.today.tags[selectedTag]?.due || 0)} />
-              <Stat label="New" value={String(sessionData?.today.tags[selectedTag]?.new || 0)} />
-              <Stat label="Done today" value={String(sessionData?.today.tags[selectedTag]?.completed || 0)} />
+              <Stat label="Due" value={String(displaySessionData?.today.tags[selectedTag]?.due || 0)} />
+              <Stat label="New" value={String(displaySessionData?.today.tags[selectedTag]?.new || 0)} />
+              <Stat label="Done today" value={String(displaySessionData?.today.tags[selectedTag]?.completed || 0)} />
             </div>
           </section>
         </aside>
