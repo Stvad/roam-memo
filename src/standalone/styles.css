@@ -476,3 +476,141 @@ input:focus {
     min-width: 100%;
   }
 }
+
+@media (max-width: 720px) {
+  .page-shell {
+    padding: 12px;
+  }
+
+  .hero-panel,
+  .panel-card {
+    border-radius: 20px;
+  }
+
+  .hero-panel {
+    padding: 14px;
+    align-items: start;
+  }
+
+  .layout-grid {
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .review-panel {
+    order: -1;
+  }
+
+  .settings-panel {
+    gap: 14px;
+  }
+
+  .panel-card {
+    padding: 16px;
+  }
+
+  .panel-heading,
+  .review-header,
+  .answer-header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .panel-heading .button,
+  .answer-header .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .review-header {
+    gap: 10px;
+  }
+
+  .review-header h2 {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .status-cluster {
+    width: 100%;
+  }
+
+  .status-badge {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .deck-pill {
+    align-items: start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .deck-totals {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .field-row {
+    gap: 10px;
+  }
+
+  .checkbox-row {
+    margin-top: 0;
+  }
+
+  .prompt-block,
+  .answer-block,
+  .context-block {
+    padding: 16px;
+    margin-top: 14px;
+  }
+
+  .block-text,
+  .answer-tree,
+  .answer-placeholder {
+    font-size: 1rem;
+  }
+
+  .breadcrumbs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    margin-right: -2px;
+  }
+
+  .crumb {
+    white-space: nowrap;
+  }
+
+  .action-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .action-row .button {
+    width: 100%;
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+
+  .grade-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .grade-button {
+    min-height: 72px;
+    padding: 14px;
+  }
+
+  .banner {
+    padding: 12px 14px;
+  }
+
+  .empty-state {
+    min-height: 32vh;
+    padding-block: 24px;
+  }
+}
